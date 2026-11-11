@@ -86,6 +86,76 @@ generated per request; keep the host clock in sync. See `ExWalmart.Signature`.
 API calls — but without it the links Walmart returns carry a `|PUBID|`
 placeholder instead of your id, and the `affiliate_*` link builders raise.
 
+## Trying it in IEx
+
+Clone the repo (or use any project that depends on `:ex_walmart`) and start a
+session with the project loaded:
+
+```sh
+mix deps.get
+iex -S mix
+```
+
+Build a client straight from the private key file:
+
+```elixir
+client =
+  ExWalmart.new(
+    "your-consumer-id",
+    File.read!("walmart_private.pem"),
+    publisher_id: "your-impact-id"   # optional
+  )
+
+{:ok, %{"items" => [item | _]}} = ExWalmart.search(client, "olive oil", num_items: 3)
+item["name"]
+item["salePrice"]
+
+ExWalmart.get_item(client, item["itemId"], zip_code: "85281")
+ExWalmart.stores_by_zip(client, "85281")
+```
+
+`{:error, :unauthorized}` usually means a wrong consumer id, a private key that
+doesn't match the uploaded public key, or a key version other than `1` (pass
+`key_version: "2"`).
+
+### Environment variables
+
+The examples in this README read credentials from the environment. Set them
+before starting `iex`:
+
+```sh
+# bash / zsh
+export WALMART_CONSUMER_ID="your-consumer-id"
+export WALMART_PRIVATE_KEY="$(cat walmart_private.pem)"
+export WALMART_PUBLISHER_ID="your-impact-id"
+```
+
+```powershell
+# PowerShell
+$env:WALMART_CONSUMER_ID = "your-consumer-id"
+$env:WALMART_PRIVATE_KEY = Get-Content walmart_private.pem -Raw
+$env:WALMART_PUBLISHER_ID = "your-impact-id"
+```
+
+Where a host only allows single-line values, replace the PEM's newlines with
+literal `\n` — `ExWalmart.new/3` turns them back. Keep the private key out of
+version control.
+
+### Without credentials
+
+The link builders make no HTTP calls, so they can be tried before you have a
+walmart.io application. `ExWalmart.new/3` still needs a parseable RSA key, so
+generate a throwaway one:
+
+```elixir
+key = :public_key.generate_key({:rsa, 2048, 65_537})
+pem = :public_key.pem_encode([:public_key.pem_entry_encode(:RSAPrivateKey, key)])
+client = ExWalmart.new("test", pem, publisher_id: "1234567")
+
+ExWalmart.add_to_cart_url([{10_450_114, 2}, 44_390_948])
+ExWalmart.affiliate_add_to_cart_url(client, [{10_450_114, 2}, 44_390_948], sub_id: "recipe-42")
+```
+
 ## Options
 
 `ExWalmart.new/3` accepts:
